@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@service/backend": ["packages/backend/src/*"],
+      "@service/migrations": ["packages/migrations/src/*"]
+    }
+  },
+  "exclude": ["node_modules"]
+}

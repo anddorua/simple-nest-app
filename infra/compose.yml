@@ -1,0 +1,16 @@
+version: '3.1'
+
+services:
+  mysql:
+    image: "mysql:9.2"
+    restart: always
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+
+    env_file: 
+      - ".mysql.dev.env"
+
+volumes:
+  mysql-data:
