@@ -1,0 +1,59 @@
+name: Build & Deploy to ECR
+
+on:
+  push:
+    # Runs whenever a new tag is pushed. Adjust the pattern as needed.
+    # For example, if you tag with "v1.2.3", this will trigger.
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Check out the code
+      - name: Check out repository
+        uses: actions/checkout@v3
+
+      # 2. Extract the version from the tag name (strip leading 'v')
+      #    If you push tags like "v1.2.3", then VERSION will be "1.2.3".
+      - name: Extract version from tag
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
+
+      # 3. Configure AWS credentials
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      # 4. Log in to ECR
+      - name: Log in to Amazon ECR
+        run: |
+          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} \
+            | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+
+      # 5. Build, tag, and push
+      - name: Build and push Docker image
+        run: |
+          cd packages/backend
+          
+          # Use your repository name from ECR; replace 'simple-nest-app-repository' if needed
+          ECR_REPOSITORY="simple-nest-app-repository"
+          VERSION="${{ env.VERSION }}"
+          AWS_ACCOUNT_ID="${{ secrets.AWS_ACCOUNT_ID }}"
+          AWS_REGION="${{ secrets.AWS_REGION }}"
+          
+          # Build Docker images with two tags: latest and the version from the tag
+          docker build -t ${ECR_REPOSITORY}:latest -t ${ECR_REPOSITORY}:${VERSION} .
+          
+          # Tag images in the format required by ECR
+          docker tag ${ECR_REPOSITORY}:latest ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}:latest
+          docker tag ${ECR_REPOSITORY}:${VERSION} ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}:${VERSION}
+          
+          # Push both tags
+          docker push ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}:latest
+          docker push ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}:${VERSION}
